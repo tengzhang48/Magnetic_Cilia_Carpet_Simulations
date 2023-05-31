@@ -1,0 +1,65 @@
+
+units         lj
+dimension 3
+atom_style molecular
+boundary    p p p
+processors     2 2 4
+# ------------------------- SETTINGS ---------------------------------
+neighbor       0.3 bin
+neigh_modify   delay 0 every 1
+atom_modify    sort 10 2
+comm_modify    mode single cutoff 0.6 vel yes
+
+comm_style brick
+
+# ------------------------ FORCE FIELDS ------------------------------
+#define the potential 
+
+bond_style harmonic
+improper_style octa
+# ------------------------ READ DATA ------------------------------
+read_data 3d_loco_cilium-cube-lattice.lam
+# ------------------------ compute potential energy -----------------
+#compute         patompe all pe/atom
+#pair_style	granular 
+#pair_coeff      * * hooke 1000 50 tangential linear_nohistory 1.0 0.4 damping mass_velocity
+#----------------------- Define group ------------------------------
+
+
+region bottom block INF INF INF INF INF 1 units box
+
+
+group bottom region bottom
+
+#---------------------------------------------------------
+
+timestep 0.0005
+
+#----------------------Read forces---------------------
+
+variable mf1 atomfile robot_m06_br30ba0_forcex.txt
+variable mf2 atomfile robot_m06_br30ba0_forcey.txt
+variable mf3 atomfile robot_m06_br30ba0_forcez.txt
+variable mg atomfile gravity.txt
+
+#---------------------Gradully increase the force-----------------------
+variable loadfactor equal vdisplace(0,0.00008333)
+variable ca equal cos(0*PI/180+2*v_loadfactor*PI)
+variable sa equal sin(0*PI/180+2*v_loadfactor*PI)
+
+#variable rmf1 atom "v_mf1*v_loadfactor"
+#variable rmf3 atom "v_mf3*v_loadfactor"
+variable rmf1 atom "2*(v_ca*v_mf1-v_sa*v_mf3)"
+variable rmf3 atom "2*(v_sa*v_mf1+v_ca*v_mf3)"
+
+fix         1 all nve
+fix         2 all langevin 0.001 0.001 1.0 699483
+fix         3 all addforce v_rmf1 0.0 v_rmf3
+fix         4 all addforce 0.0 0.0 v_mg
+#fix         5 cilia wall/gran hooke 10000000 NULL 50.0 NULL 0.4 1 xplane 0.0 NULL contacts
+fix         6 bottom move linear 0.0 0.0 0.0
+
+thermo 10000
+dump       1 all custom 100000 cilia.xyz id type x y z vx vy vz fx fy fz
+
+run 48000000
