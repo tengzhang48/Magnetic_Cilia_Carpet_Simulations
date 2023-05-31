@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+#SBATCH --job-name=lammps-test
+#SBATCH --partition=normal
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=64
+#SBATCH --time=00-23:30:00
+#SBATCH --output=lammps-test.o%j.%N
+
+declare -xr COMPILER_MODULE='gnu8/8.3.0'
+declare -xr MPI_MODULE='openmpi3/3.1.4'
+declare -xr CMAKE_MODULE='cmake/3.15.4'
+
+module purge
+module load "${COMPILER_MODULE}"
+module load "${MPI_MODULE}"
+module load "${CMAKE_MODULE}"
+module list
+printenv
+
+
+processors=$(( $SLURM_NNODES * $SLURM_NTASKS_PER_NODE ))
+/opt/ohpc/pub/mpi/openmpi3-gnu8/3.1.4/bin/mpirun -np $processors /home/hjiang37/lammps-23Jun22/src/lmp_mpi -in in.gran_mindlin

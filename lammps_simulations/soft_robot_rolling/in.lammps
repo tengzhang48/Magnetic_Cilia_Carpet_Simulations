@@ -1,0 +1,84 @@
+
+units         lj
+dimension 3
+atom_style hybrid molecular sphere
+boundary    p p f
+processors     16 2 2
+# ------------------------- SETTINGS ---------------------------------
+neighbor       0.3 bin
+neigh_modify   delay 0 every 1
+atom_modify    sort 10 2
+comm_modify    mode single cutoff 3 vel yes
+
+comm_style brick
+
+# ------------------------ FORCE FIELDS ------------------------------
+#define the potential 
+
+bond_style harmonic
+improper_style octa
+# ------------------------ READ DATA ------------------------------
+read_data loco_8x1.lam
+# ------------------------ compute potential energy -----------------
+#compute         patompe all pe/atom
+pair_style granular
+pair_coeff * * dmt 1.85e2 10 0.49 0.01 tangential mindlin_rescale NULL 1.0 1 damping mass_velocity
+special_bonds lj/coul 0.0 0.0 1.0
+
+#----------------------- Define group ------------------------------
+
+region cilia block INF INF INF INF INF 3.9 units box
+region front block INF INF 2 2 INF INF units box
+region back block INF INF 6 6 INF INF units box
+
+group cilia region cilia
+group front region front
+group back region back
+group sides union front back
+
+displace_atoms all move 0 0 2.2 units box
+#---------------------------------------------------------
+
+timestep 0.0003
+
+#----------------------Read forces---------------------
+
+variable mf1 atomfile robot_m06_br0ba0_forcex.txt
+variable mf2 atomfile robot_m06_br0ba0_forcey.txt
+variable mf3 atomfile robot_m06_br0ba0_forcez.txt
+variable mg atomfile gravity.txt
+
+#---------------------Add gravity force to relax the structure-----------------------
+fix         1 all nve
+fix         2 all langevin 0.001 0.001 1.0 699483
+fix         3 all addforce 0.0 0.0 v_mg
+fix         4 all wall/gran granular dmt 1500e3 10 0.44 1.5 tangential mindlin_rescale NULL 1 1 damping mass_velocity zplane 2.0 NULL contacts
+fix         6 sides setforce NULL 0.0 NULL
+fix 	     7 all balance 1000 1.05 shift x 10 1.05
+
+thermo 10000
+dump       1 all custom 200000 ./fxyz/cilia_relax_*.xyz id type x y z vx vy vz fx fy fz
+
+run 1000000
+undump 1
+unfix 3
+
+#---------------------Gradully increase the force-----------------------
+reset_timestep 0
+
+#variable loadfactor equal vdisplace(0,0.00005556)
+variable loadfactor equal vdisplace(0,0.00008333)
+variable ca equal cos(90*PI/180-2*v_loadfactor*PI)
+variable sa equal sin(90*PI/180-2*v_loadfactor*PI)
+
+#variable rmf1 atom "v_mf1*v_loadfactor"
+#variable rmf3 atom "v_mf3*v_loadfactor"
+variable rmf1 atom "0.9*(v_ca*v_mf1-v_sa*v_mf3)"
+variable rmf3 atom "0.9*(v_sa*v_mf1+v_ca*v_mf3)+v_mg"
+
+fix         3 all addforce v_rmf1 0.0 v_rmf3
+
+thermo 10000
+dump       1 all custom 2000000 ./fxyz/cilia_rolling_*.xyz id type x y z vx vy vz fx fy fz
+
+run 200000000
