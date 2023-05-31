@@ -1,0 +1,75 @@
+
+units         lj
+dimension 3
+atom_style hybrid molecular sphere
+boundary    p p f
+processors     8 2 1
+# ------------------------- SETTINGS ---------------------------------
+neighbor       0.3 bin
+neigh_modify   delay 0 every 1
+atom_modify    sort 10 2
+comm_modify    mode single cutoff 1 vel yes
+
+comm_style brick
+
+# ------------------------ FORCE FIELDS ------------------------------
+#define the potential 
+
+bond_style harmonic
+improper_style octa
+# ------------------------ READ DATA ------------------------------
+read_data 36mm_0_8mm-cube-lattice.lam
+# ------------------------ compute potential energy -----------------
+#compute         patompe all pe/atom
+pair_style gran/hooke/history 8000 8000 0.0 30.0 1 1
+pair_coeff * * 
+special_bonds lj/coul 0.0 0.0 1.0
+
+#----------------------- Define group ------------------------------
+region top block INF INF INF INF 4.8 4.8 units box
+region cilia block INF INF INF INF INF 3.9 units box
+region front block INF INF 2 2 INF INF units box
+region back block INF INF 6 6 INF INF units box
+
+group top region top
+group cilia region cilia
+group front region front
+group back region back
+group sides union front back
+
+displace_atoms all move 16 0 20 units box
+#---------------------------------------------------------
+
+timestep 0.0005
+
+#----------------------Read forces---------------------
+
+variable mf1 atomfile robot_m06_br0ba0_forcex.txt
+variable mf2 atomfile robot_m06_br0ba0_forcey.txt
+variable mf3 atomfile robot_m06_br0ba0_forcez.txt
+variable mg atomfile gravity.txt
+
+
+variable loadfactor equal vdisplace(0,0.00008333)
+variable ca equal cos(-90*PI/180+2*v_loadfactor*PI)
+variable sa equal sin(-90*PI/180+2*v_loadfactor*PI)
+
+#variable ca equal cos(-90*PI/180)
+#variable sa equal sin(-90*PI/180)
+
+
+variable rmf1 atom "1.2*(v_ca*v_mf1-v_sa*v_mf3)"
+variable rmf3 atom "1.2*(v_sa*v_mf1+v_ca*v_mf3)-v_mg"
+
+fix         1 all nve
+fix         2 all langevin 0.0001 0.0001 1.0 699483
+fix         3 all addforce v_rmf1 0.0 v_rmf3
+fix         4 top setforce 0.0 0.0 0.0
+fix         6 sides setforce NULL 0.0 NULL
+fix 	    7 all balance 1000 1.05 shift x 10 1.05
+
+
+thermo 10000
+dump       1 all custom 600000 ./fxyz/cilia_beating_*.xyz id type x y z vx vy vz fx fy fz
+
+run 24000000

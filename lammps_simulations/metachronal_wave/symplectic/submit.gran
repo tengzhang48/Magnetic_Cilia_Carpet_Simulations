@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+#SBATCH --output="lmp.o%j.%N"
+#SBATCH --export=ALL
+#SBATCH --job-name=droplet_film
+#SBATCH --account=syu114
+#SBATCH --partition=shared
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=16
+#SBATCH --time=48:00:00
+#SBATCH --no-requeue
+#SBATCH --mem=18G
+
+declare -xr CPU='cpu/0.15.4'
+declare -xr COMPILER_MODULE='gcc/10.2.0'
+declare -xr MPI_MODULE='openmpi/4.0.4'
+declare -xr CMAKE_MODULE='cmake/3.18.2'
+
+module purge
+module load slurm
+module load "${CPU}"
+module load "${COMPILER_MODULE}"
+module load "${MPI_MODULE}"
+module load "${CMAKE_MODULE}"
+processors=$(( $SLURM_NNODES * $SLURM_NTASKS_PER_NODE ))
+mpirun -np $processors /home/hjiang37/lammps-23Jun2022/src/lmp_mpi -in in.gran
