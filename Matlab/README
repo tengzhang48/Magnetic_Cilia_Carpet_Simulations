@@ -1,1 +1,3 @@
 This folder contains matlab codes to create lammps data files for the lattice model simulations with magentic forces.
+The profiles of the magnetic residual flux are coded inside the "functions" folder. Therefore, each example will have slighlty different parts in the functions.
+This is only for the magnetic force calculations. For the lammps data file, all the examples use the same functions. 
